@@ -1,35 +1,15 @@
-name: AI Blog to WordPress
+- name: Post to WordPress
+  run: |
+    CONTENT=$(jq -Rs . < blog.txt)
 
-on:
-  workflow_dispatch:
+    RESPONSE=$(curl -s -X POST \
+      -u "${{ secrets.WP_USERNAME }}:${{ secrets.WP_PASSWORD }}" \
+      -H "Content-Type: application/json" \
+      http://freehosting.live/wp-json/wp/v2/posts \
+      -d "{
+        \"title\": \"Mud Interlock House Guide\",
+        \"content\": $CONTENT,
+        \"status\": \"publish\"
+      }")
 
-jobs:
-  post:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Generate AI Content
-        run: |
-          RESPONSE=$(curl -s https://api.openai.com/v1/responses \
-            -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "model": "gpt-4.1-mini",
-              "input": "Write a simple SEO blog about Mud Interlock Houses in Tamil Nadu. Include benefits and cost."
-            }')
-
-          echo "$RESPONSE" | jq -r '.output[0].content[0].text' > blog.txt
-
-      - name: Post to WordPress
-        run: |
-          CONTENT=$(cat blog.txt)
-
-          curl -X POST \
-          -u "${{ secrets.WP_USERNAME }}:${{ secrets.WP_PASSWORD }}" \
-          -H "Content-Type: application/json" \
-          http://freehosting.live/wp-json/wp/v2/posts \
-          -d "{
-            \"title\": \"Mud Interlock House Guide\",
-            \"content\": \"$CONTENT\",
-            \"status\": \"publish\"
-          }"
+    echo "$RESPONSE"
