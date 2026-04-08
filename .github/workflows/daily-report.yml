@@ -1,8 +1,8 @@
-name: Daily Report
+name: Daily AI Report
 
 on:
   schedule:
-    - cron: '0 9 * * *'  # runs daily at 9 AM
+    - cron: '0 9 * * *'
   workflow_dispatch:
 
 jobs:
@@ -10,21 +10,39 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Get Commits
-        id: commits
+      - name: Get commits
         run: |
-          curl -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+          curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
           https://api.github.com/repos/UVRAJ1990/codex-automation/commits > commits.json
 
-      - name: Create Report Issue
+      - name: Prepare commit messages
         run: |
-          echo "Creating daily report..."
+          cat commits.json | jq '.[].commit.message' > messages.txt
 
-          curl -X POST \
+      - name: Generate AI Summary
+        id: ai
+        run: |
+          PROMPT=$(cat messages.txt)
+
+          RESPONSE=$(curl -s https://api.openai.com/v1/responses \
+            -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"model\": \"gpt-4.1-mini\",
+              \"input\": \"Summarize these git commits into sections: Features, Fixes, Improvements. Keep it short and clean:\n$PROMPT\"
+            }")
+
+          echo "$RESPONSE" | jq -r '.output[0].content[0].text' > summary.txt
+
+      - name: Create GitHub Issue
+        run: |
+          SUMMARY=$(cat summary.txt)
+
+          curl -s -X POST \
           -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
           -H "Content-Type: application/json" \
           https://api.github.com/repos/UVRAJ1990/codex-automation/issues \
-          -d '{
-            "title": "Daily Report",
-            "body": "Auto-generated report. (Next step: connect Codex AI)"
-          }'
+          -d "{
+            \"title\": \"Daily AI Report\",
+            \"body\": \"$SUMMARY\"
+          }"
